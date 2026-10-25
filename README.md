@@ -43,12 +43,14 @@ pushes from inside work.
    here — do it when you want the fleet snapshot to move, e.g.
    `git submodule update --remote && git commit -am "sync fleet"`.
 
-Lifecycle note: the heavy warm-up (submodule init + Nix dev-shell
-realization) lives in `updateContentCommand`, which runs during
-prebuilds and is skipped when a codespace is created from a snapshot.
-`postCreateCommand` re-runs on every create, so it is only a fast
-version check. (Learned 2026-10-25: with the warm-up in postCreate, a
-prebuilt codespace still spent 12+ minutes re-realizing the Nix shell.)
+Lifecycle note: `updateContentCommand` (runs during prebuilds, skipped
+on snapshot creates) does submodule init only. Nix is installed in the
+image but deliberately **not** warmed at startup — realizing a repo's
+dev shell was the entire cold-start cost (~15-25 min) and re-ran
+unreliably from snapshots. Shells realize lazily, per repo, on first
+`direnv`/`nix develop` inside the codespace; you pay it once, only for
+the repo you're actually working in. `postCreateCommand` is just a
+fast version check.
 
 ## Codespaces discipline (GitHub Pro: 180 core-hours + 20 GB storage/mo)
 
