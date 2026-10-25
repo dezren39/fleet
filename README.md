@@ -21,10 +21,15 @@ this repo is the prebuild play.
 | `openchamber/` | developing-today/openchamber |
 | `nix/` | dezren39/nix |
 | `zettel/` | developing-today/zettel |
+| `hatch/` | dezren39/hatch |
+| `hatch-personal/` | dezren39/hatch-personal (private) |
 
-All five are public, so clones inside a codespace need no extra auth.
-The devcontainer requests write permission for the five repos at
-codespace creation (approve the prompt) so pushes from inside work.
+Six are public, so clones inside a codespace need no extra auth.
+`hatch-personal` is private: the umbrella records only its SHA, and its
+init in postCreate is best-effort — it clones only when the codespace
+was granted access to it. The devcontainer requests write permission
+for all seven repos at codespace creation (approve the prompt) so
+pushes from inside work.
 
 ## Working in it
 
