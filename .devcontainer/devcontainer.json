@@ -64,6 +64,7 @@
     }
   },
   "name": "fleet",
-  "postCreateCommand": "bash -lc 'git submodule update --init --jobs 4 code opencode openchamber nix zettel hatch ; git submodule update --init hatch-personal || echo hatch-personal-skipped-private ; (cd code && direnv allow .) ; nix develop ./code/src/id --command bash -c \"cargo --version && rustc --version\" ; go version ; nix --version'",
-  "remoteUser": "vscode"
+  "postCreateCommand": "bash -lc 'go version && nix --version && echo fleet-ready'",
+  "remoteUser": "vscode",
+  "updateContentCommand": "bash -lc 'git submodule update --init --jobs 4 code opencode openchamber nix zettel hatch ; git submodule update --init hatch-personal || echo hatch-personal-skipped-private ; (cd code && direnv allow .) ; nix develop ./code/src/id --command bash -c \"cargo --version && rustc --version\" ; go version ; nix --version'"
 }
