@@ -80,6 +80,38 @@ name: fleet-run (generic dispatch runner)
 # fleet-umbrella-verify.yml (docs/execution-surfaces.md). Dispatch
 # behaviour is unchanged.
 #
+# Runner selection (2026-11-06): a fleet job can run on
+# GitHub-hosted runners OR Blacksmith runners — Drew's order was
+# that a fleet job must not be Blacksmith-only, so both providers
+# are first-class here. Two inputs (mirrored in the workflow_call
+# form below):
+#
+#   runner        - the run legs: github (ubuntu-24.04, the
+#                   default) or blacksmith
+#                   (blacksmith-4vcpu-ubuntu-2404)
+#   setup_runner  - the setup job: same providers, same mapping,
+#                   same default
+#
+# The input names and runner labels mirror org-run in
+# developing-today/code (the legs' `runner` input there came from
+# PR #5417; `setup_runner` from PR #6639). One deliberate
+# difference: org-run defaults setup_runner to blacksmith, while
+# fleet-run defaults BOTH inputs to github. This repo is a
+# personal repo and Blacksmith is orgs-only — it cannot run here
+# at all — so the default has to be the provider that works
+# everywhere; the org forks this file propagates to can pass
+# blacksmith explicitly where the Blacksmith app is installed.
+# Callers that pass neither input (fleet-umbrella-verify.yml
+# today) see no change in behaviour.
+#
+# Blacksmith runners are drop-in Ubuntu 24.04 runners, so the
+# legs' container spec below (the fleet-build:full image, run as
+# root) works unchanged on either provider; no leg step assumes
+# GitHub-hosted hardware. In the workflow_call form the two
+# runner inputs are plain strings (workflow_call inputs have no
+# choice type): any value other than blacksmith selects the
+# GitHub-hosted label, exactly as in the dispatch form's mapping.
+#
 # The legs run in the published org image
 # ghcr.io/developing-today/fleet-build:full as root: the pinned
 # toolchain, Nix, and the baked cache configuration are already
@@ -124,6 +156,22 @@ on:
         type: number
         required: false
         default: 60
+      runner:
+        description: "Runner provider for the legs: github (ubuntu-24.04, default) or blacksmith (blacksmith-4vcpu-ubuntu-2404; org surfaces only)"
+        type: choice
+        required: false
+        default: "github"
+        options:
+          - github
+          - blacksmith
+      setup_runner:
+        description: "Runner provider for the setup job: github (ubuntu-24.04, default) or blacksmith (blacksmith-4vcpu-ubuntu-2404; org surfaces only)"
+        type: choice
+        required: false
+        default: "github"
+        options:
+          - github
+          - blacksmith
   workflow_call:
     # Reusable form: a caller workflow in this repo runs the same
     # setup/run jobs with inputs mirroring the dispatch ones above.
@@ -155,6 +203,16 @@ on:
         type: number
         required: false
         default: 60
+      runner:
+        description: "Runner provider for the legs: github (ubuntu-24.04, default) or blacksmith (blacksmith-4vcpu-ubuntu-2404; org surfaces only)"
+        type: string
+        required: false
+        default: "github"
+      setup_runner:
+        description: "Runner provider for the setup job: github (ubuntu-24.04, default) or blacksmith (blacksmith-4vcpu-ubuntu-2404; org surfaces only)"
+        type: string
+        required: false
+        default: "github"
     secrets:
       GHCR_ORG_PAT:
         description: "Classic PAT the legs use to check out target repos (repo scope)"
@@ -170,7 +228,7 @@ defaults:
 jobs:
   setup:
     name: setup
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.setup_runner == 'blacksmith' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.resolve.outputs.matrix }}
@@ -300,7 +358,7 @@ jobs:
   run:
     name: "run (${{ matrix.repo }} #${{ matrix.idx }})"
     needs: setup
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner == 'blacksmith' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-24.04' }}
     # The input is clamped into range so an out-of-range value can
     # never set an absurd timeout; the validate step then fails the
     # run fast with the reason.
