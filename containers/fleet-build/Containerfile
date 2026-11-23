@@ -63,6 +63,32 @@ USER root
 # default; the store is world-readable and root bypasses ownership).
 RUN ln -s /home/vscode/.nix-profile/bin/nix /usr/local/bin/nix \
  && ln -s /home/vscode/.nix-profile/bin/nix-build /usr/local/bin/nix-build || true
+
+# Root (and any other non-vscode user) gets a working out-of-the-box nix
+# too (code#13159). The nix.conf above lives in vscode's HOME, so root --
+# which is who fleet-command job containers run as -- used to fall back
+# to compiled-in defaults: no experimental features (nix-command
+# disabled), build-users-group pointing at a nixbld group that did not
+# exist, and, with the group forced empty, unsandboxed builds running
+# as the invoking user tripping the /homeless-shelter purity check.
+# Fix both halves at the image layer:
+#   * a system-wide /etc/nix/nix.conf -- a copy of vscode's proven
+#     config with build-users-group flipped to nixbld. vscode's own
+#     user config still wins for vscode, and export.sh's NIX_CONFIG
+#     still wins where it is set, so neither existing path changes;
+#   * the nixbld group with 32 build users IN its member list (nix
+#     checks the group's member list; primary-group-only membership
+#     reads as "no members" -- the shape proven in-job on 2026-11-23,
+#     run 45177477297). Builds then run as nixbldN with home
+#     /var/empty, which passes the unsandboxed purity check.
+RUN groupadd -f nixbld \
+ && for i in $(seq 1 32); do \
+      useradd -M -g nixbld -d /var/empty -s /bin/false "nixbld$i" \
+      && usermod -a -G nixbld "nixbld$i"; \
+    done \
+ && mkdir -p /etc/nix \
+ && cp /home/vscode/.config/nix/nix.conf /etc/nix/nix.conf \
+ && sed -i 's/^build-users-group =.*/build-users-group = nixbld/' /etc/nix/nix.conf
 USER vscode
 WORKDIR /home/vscode
 
